@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intérprete FOR </title>
+    <style>
+        /* ... TU CÓDIGO CSS COMPLETO VA AQUÍ ... */
+        :root {
+            --color-primary: #007bff; /* Azul fuerte */
+            --color-secondary: #ffc107; /* Amarillo */
+            --color-success: #28a745; /* Verde */
+            --color-background: #f0f8ff; /* Fondo celeste pálido */
+            --color-text: #333;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: var(--color-background);
+            color: var(--color-text);
+            margin: 0;
+            padding: 30px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            max-width: 900px;
+            width: 100%;
+            background: white;
+            padding: 20px;
+            border: 3px solid var(--color-primary);
+            box-shadow: 4px 4px 0 #333;
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+        }
+        .header {
+            grid-column: 1 / 3;
+            text-align: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px dashed #ccc;
+        }
+        h1 { 
+            color: var(--color-primary); 
+            font-size: 1.8em; 
+            margin: 0; 
+            text-shadow: 1px 1px 0 var(--color-secondary);
+        }
+        .description { font-size: 0.9em; color: #555; margin-top: 5px; }
+
+        textarea {
+            padding: 10px;
+            border: 2px solid #333;
+            border-radius: 0;
+            font-family: monospace;
+            font-size: 13px;
+            min-height: 250px;
+            margin-bottom: 10px;
+            width: calc(100% - 24px);
+            box-sizing: border-box;
+        }
+        button {
+            background-color: var(--color-success);
+            color: white;
+            padding: 8px 12px;
+            border: 3px outset #000;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:active {
+            border: 3px inset #000;
+        }
+
+        .output-section {
+            border: 1px solid #aaa;
+            padding: 15px;
+            background-color: #fffacd;
+        }
+        h2 {
+            font-size: 1.2em;
+            color: #d9534f;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        
+        #output-trace-container table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        #output-trace-container th, #output-trace-container td {
+            padding: 5px;
+            text-align: left;
+            border: 1px solid #ccc;
+            font-size: 0.85em;
+        }
+        #output-trace-container th {
+            background-color: #eee;
+        }
+        .code-snippet {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 3px;
+            color: #800080;
+        }
+        .status-message {
+            padding: 8px;
+            margin-top: 10px;
+            border: 2px solid;
+            font-weight: bold;
+        }
+        .success { background-color: #d4edda; color: var(--color-success); border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+        .loading { background-color: #e6f7ff; color: #007bff; border-color: #b3d9ff; }
+
+        @media (max-width: 768px) {
+            .container { grid-template-columns: 1fr; gap: 15px; }
+            .header { grid-column: 1 / 2; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>FOR </h1>
+           
+        </div>
+
+        <div class="editor-section">
+            <label for="code-input">Código:</label>
+            <textarea id="code-input">{% if codigo_previo %}{{ codigo_previo }}{% else %}i = 0; x = 1; for (i = 1; i < 5; i++) { x = x * 2; }{% endif %}</textarea>
+            
+            <button onclick="ejecutarCodigo()">empezar</button>
+        </div>
+
+        <div class="output-section">
+            <h2>Ejecución paso a paso</h2>
+            <div id="output-trace-container">
+                <p>Presiona empezar para ejecutar el código.</p>
+            </div>
+            
+            <h2 style="margin-top: 15px; border-top: 1px dotted #ccc; padding-top: 10px;">Resultado Final</h2>
+            <div id="final-state"><code>{}</code></div>
+            
+            <div id="status-message" class="status-message">Listo.</div>
+        </div>
+    </div>
+
+    <script>
+        // Función auxiliar para formatear el estado de variables como JSON legible
+        function formatVariables(state) {
+            return '{' + Object.entries(state).map(([k, v]) => `${k}: ${v}`).join(', ') + '}';
+        }
+        
+        function renderTraceTable(trace, final_variables) {
+            const traceContainer = document.getElementById('output-trace-container');
+            const finalStateDiv = document.getElementById('final-state');
+            
+            if (trace.length === 0) {
+                traceContainer.innerHTML = '<p>Ejecución finalizada. No se registraron pasos o la memoria está vacía.</p>';
+            }
+
+            let html = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Paso de Ejecución</th>
+                            <th>Estado de Variables</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            const codeLines = document.getElementById('code-input').value.split('\n');
+
+            trace.forEach((step) => {
+                const codeSnippet = codeLines[step.line - 1] ? `Línea ${step.line}: ${codeLines[step.line - 1].trim()}` : "Paso sin línea asociada";
+
+                html += `
+                    <tr>
+                        <td>
+                            <span class="code-snippet">${codeSnippet}</span>
+                            ${step.description}
+                        </td>
+                        <td><code>${formatVariables(step.state)}</code></td>
+                    </tr>
+                `;
+            });
+            
+            html += `</tbody></table>`;
+            traceContainer.innerHTML = html;
+
+            finalStateDiv.innerHTML = `<code>${formatVariables(final_variables)}</code>`;
+        }
+
+        async function ejecutarCodigo() {
+            const codigo = document.getElementById('code-input').value;
+            const statusMessageDiv = document.getElementById('status-message');
+            const traceContainer = document.getElementById('output-trace-container');
+            const finalStateDiv = document.getElementById('final-state');
+            
+            traceContainer.innerHTML = "<p>Cargando...</p>";
+            finalStateDiv.innerHTML = "<code>{}</code>";
+            statusMessageDiv.innerHTML = "Procesando código...";
+            statusMessageDiv.className = 'status-message loading';
+
+            try {
+                // Llama a la nueva ruta AJAX de Django
+                const response = await fetch('{% url "ejecutar_codigo" %}', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        // OBLIGATORIO para peticiones POST en Django (Aunque usamos @csrf_exempt, es buena práctica)
+                        'X-CSRFToken': '{{ csrf_token }}' 
+                    }, 
+                    body: JSON.stringify({ codigo: codigo })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    renderTraceTable(data.trace, data.final_variables); 
+                    
+                    statusMessageDiv.innerHTML = `¡Ejecución Exitosa!`;
+                    statusMessageDiv.classList.remove('error', 'loading');
+                    statusMessageDiv.classList.add('success');
+                } else {
+                    traceContainer.innerHTML = `<p>Error de sintaxis o variable no definida.</p>`;
+                    finalStateDiv.innerHTML = "<code>{}</code>";
+                    statusMessageDiv.innerHTML = `Error: ${data.error}`;
+                    statusMessageDiv.classList.remove('success', 'loading');
+                    statusMessageDiv.classList.add('error');
+                }
+            } catch (error) {
+                statusMessageDiv.innerHTML = "Error de conexión o fallo de red.";
+                statusMessageDiv.classList.remove('success', 'loading');
+                statusMessageDiv.classList.add('error');
+                console.error("Fallo de Fetch:", error);
+            }
+        }
+    </script>
+</body>
+</html>
